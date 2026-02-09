@@ -1,9 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 
-const rankingRoutes = require('./routes/rankingRoutes');
-const userRoutes = require('./routes/userRoutes');
+const rankingRoutes = require("./routes/rankingRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -12,12 +12,17 @@ app.use(cors()); // Crucial para Flutter
 app.use(express.json()); // Permite leer JSON en req.body
 
 // Rutas base
-app.use('/api/ranking', rankingRoutes);
-app.use('/api/users', userRoutes);
+app.use("/api/ranking", rankingRoutes);
+app.use("/api/users", userRoutes);
 
 // Middleware para rutas no encontradas
 app.use((req, res) => {
-    res.status(404).json({ status: 'error', message: 'Ruta no encontrada' });
+  res.status(404).json({ status: "error", message: "Ruta no encontrada" });
+});
+
+// Ruta de diagnóstico
+app.get("/ping", (req, res) => {
+  res.json({ status: "ok", message: "El servidor responde" });
 });
 
 module.exports = app;

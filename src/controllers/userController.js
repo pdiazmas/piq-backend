@@ -1,57 +1,64 @@
-// Base de datos temporal
-let playerPoints = {
-  Alice: 20000,
-  Bob: 195000,
-  Charlie: 900,
-};
+const User = require('../models/User');
 
-// --- NUEVO: Obtener todos los usuarios ---
-exports.getAllUsers = (req, res) => {
-  // Convertimos el objeto en una lista para que sea más fácil de leer en Flutter
-  const usersList = Object.keys(playerPoints).map((name) => ({
-    name: name,
-    points: playerPoints[name],
-  }));
-
-  res.json({ status: "success", data: usersList });
-};
-
-// Obtener puntos de un jugador específico
-exports.getPlayerPoints = (req, res) => {
-  const { playerName } = req.params;
-  const points = playerPoints[playerName];
-
-  if (points !== undefined) {
-    res.json({ status: "success", data: { name: playerName, points } });
-  } else {
-    res.status(404).json({ status: "error", message: "Jugador no encontrado" });
+// --- Obtener todos los usuarios de Postgres ---
+exports.getAllUsers = async (req, res) => {
+  try {
+    // Buscamos todos y los ordenamos por puntos de mayor a menor
+    const users = await User.findAll({
+      order: [['points', 'DESC']]
+    });
+    res.json({ status: "success", data: users });
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
   }
 };
 
-// Actualizar puntos
-exports.updatePoints = (req, res) => {
-  const { playerName, amount, operation } = req.body;
+// --- Obtener puntos de un jugador específico ---
+exports.getPlayerPoints = async (req, res) => {
+  try {
+    const { playerName } = req.params;
+    const user = await User.findOne({ where: { name: playerName } });
 
-  if (playerPoints[playerName] === undefined) {
-    return res
-      .status(404)
-      .json({ status: "error", message: "Usuario no existe" });
+    if (user) {
+      res.json({ status: "success", data: user });
+    } else {
+      res.status(404).json({ status: "error", message: "Jugador no encontrado" });
+    }
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
   }
+};
 
-  if (operation === "subtract" && playerPoints[playerName] < amount) {
-    return res
-      .status(400)
-      .json({ status: "error", message: "Saldo insuficiente" });
+// --- Actualizar puntos con persistencia en Postgres ---
+exports.updatePoints = async (req, res) => {
+  try {
+    const { playerName, amount, operation } = req.body;
+    
+    // 1. Buscamos al usuario
+    const user = await User.findOne({ where: { name: playerName } });
+
+    if (!user) {
+      return res.status(404).json({ status: "error", message: "Usuario no existe" });
+    }
+
+    // 2. Lógica de negocio
+    if (operation === "subtract" && user.points < amount) {
+      return res.status(400).json({ status: "error", message: "Saldo insuficiente" });
+    }
+
+    const newPoints = operation === "add" 
+      ? user.points + parseInt(amount) 
+      : user.points - parseInt(amount);
+
+    // 3. Guardamos los cambios
+    await user.update({ points: newPoints });
+
+    res.json({
+      status: "success",
+      message: "Saldo actualizado en PostgreSQL",
+      newBalance: user.points,
+    });
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
   }
-
-  playerPoints[playerName] =
-    operation === "add"
-      ? playerPoints[playerName] + amount
-      : playerPoints[playerName] - amount;
-
-  res.json({
-    status: "success",
-    message: "Saldo actualizado",
-    newBalance: playerPoints[playerName],
-  });
 };
